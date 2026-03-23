@@ -1886,49 +1886,8 @@ function gdStatus(msg, tipo="info"){
 // URL do Google Apps Script — backend de dados
 const GAS_URL = "https://script.google.com/macros/s/AKfycbx4LgPE3VTKHK846yRcBTL72-UVo-JUKaeiF60xr9zmGEQavfolbhPP5iW0BDUzklB9UA/exec";
 
-async function gasSalvar(){
-  gdStatus("🔄 Salvando...","sync");
-  const dados = JSON.stringify({
-    aulas:state.aulas,
-    alunos:state.alunos,
-    entregas:state.entregas,
-    entregasMeta:state.entregasMeta,
-    config:state.config,
-    savedAt:new Date().toISOString()
-  });
-  // salvar também no localStorage como backup
-  try{ localStorage.setItem("samuel_class_dados", dados); }catch(e){}
-  try{
-    const resp = await fetch(GAS_URL+"?action=salvar", {
-      method:"POST",
-      mode:"no-cors",
-      headers:{"Content-Type":"text/plain"},
-      body:dados
-    });
-    gdStatus("✅ Salvo! "+new Date().toLocaleTimeString("pt-BR"),"ok");
-    showToast("☁️ Dados salvos com sucesso!");
-  } catch(e){
-    gdStatus("⚠️ Salvo localmente","info");
-    showToast("💾 Dados salvos no dispositivo!");
-  }
-}
-
-async function gasCarregar(){
-  gdStatus("🔄 Carregando...","sync");
-  try{
-    const resp = await fetch(GAS_URL+"?action=carregar");
-    const json = await resp.text();
-    aplicarDados(json);
-  } catch(e){
-    // tentar localStorage como fallback
-    const local = localStorage.getItem("samuel_class_dados");
-    if(local){ aplicarDados(local); gdStatus("📱 Dados carregados do dispositivo","ok"); }
-    else gdStatus("☁️ Nenhum dado encontrado","info");
-  }
-}
-
 function aplicarDados(json){
-  if(!json||json==="{}"){gdStatus("☁️ Nenhum dado salvo ainda.","info");return;}
+  if(!json||json==="{}"||json==="null"||!json.trim()){gdStatus("☁️ Nenhum dado salvo ainda.","info");return;}
   try{
     const d=JSON.parse(json);
     if(d.aulas) state.aulas=d.aulas;
@@ -1939,9 +1898,71 @@ function aplicarDados(json){
       TURMAS.forEach(t=>{ if(!d.alunos[t]||d.alunos[t].length===0) d.alunos[t]=ALUNOS_INICIAIS[t]||[]; });
       state.alunos=d.alunos;
     }
+    // salvar cópia local
+    try{ localStorage.setItem("samuel_class_dados", json); }catch(e){}
     gdStatus("✅ Dados carregados!","ok");
     renderPage(state.currentPage);
-  }catch(e){ gdStatus("❌ Erro ao processar dados","erro"); }
+  }catch(e){ gdStatus("❌ Erro ao processar dados: "+e.message,"erro"); }
+}
+
+async function gasSalvar(){
+  gdStatus("🔄 Salvando...","sync");
+  const dados = JSON.stringify({
+    aulas:state.aulas,
+    alunos:state.alunos,
+    entregas:state.entregas,
+    entregasMeta:state.entregasMeta,
+    config:state.config,
+    savedAt:new Date().toISOString()
+  });
+  // sempre salvar localmente primeiro
+  try{ localStorage.setItem("samuel_class_dados", dados); }catch(e){}
+
+  // salvar na nuvem via GET com dados codificados
+  try{
+    const encoded = encodeURIComponent(dados);
+    // usar iframe trick para contornar CORS no Apps Script
+    const url = GAS_URL + "?action=salvar&dados=" + encoded;
+    // criar iframe invisível para fazer o GET sem CORS
+    const iframe = document.createElement("iframe");
+    iframe.style.display="none";
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    setTimeout(()=>{ 
+      try{document.body.removeChild(iframe);}catch(e){}
+    }, 5000);
+    gdStatus("✅ Salvo! "+new Date().toLocaleTimeString("pt-BR"),"ok");
+    showToast("☁️ Dados salvos com sucesso!");
+  } catch(e){
+    gdStatus("💾 Salvo localmente","info");
+    showToast("💾 Dados salvos no dispositivo!");
+  }
+}
+
+async function gasCarregar(){
+  gdStatus("🔄 Carregando da nuvem...","sync");
+  try{
+    const resp = await fetch(GAS_URL+"?action=carregar", {cache:"no-store"});
+    if(!resp.ok) throw new Error("HTTP "+resp.status);
+    const json = await resp.text();
+    if(json && json!=="{}" && json!=="null"){
+      aplicarDados(json);
+    } else {
+      // fallback para localStorage
+      const local = localStorage.getItem("samuel_class_dados");
+      if(local){ aplicarDados(local); gdStatus("📱 Carregado do dispositivo","ok"); }
+      else gdStatus("☁️ Nenhum dado encontrado","info");
+    }
+  } catch(e){
+    // fallback para localStorage
+    const local = localStorage.getItem("samuel_class_dados");
+    if(local){ 
+      aplicarDados(local); 
+      gdStatus("📱 Carregado do dispositivo (sem internet)","ok"); 
+    } else {
+      gdStatus("❌ Sem dados e sem conexão","erro");
+    }
+  }
 }
 
 function instalarPWA(){
