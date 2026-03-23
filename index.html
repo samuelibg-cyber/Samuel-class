@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="Samuel Class"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <link rel="manifest" href="manifest.json"/>
-<link rel="apple-touch-icon" href="icon.png"/>
+<link rel="apple-touch-icon" href="%C3%ADcone.png"/>
 <title>Samuel Class</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 
@@ -1883,7 +1883,10 @@ function gdStatus(msg, tipo="info"){
   if(tipo==="ok") setTimeout(()=>{el.style.display="none";},3000);
 }
 
-function gasSalvar(){
+// URL do Google Apps Script — backend de dados
+const GAS_URL = "https://script.google.com/macros/s/AKfycbx4LgPE3VTKHK846yRcBTL72-UVo-JUKaeiF60xr9zmGEQavfolbhPP5iW0BDUzklB9UA/exec";
+
+async function gasSalvar(){
   gdStatus("🔄 Salvando...","sync");
   const dados = JSON.stringify({
     aulas:state.aulas,
@@ -1893,33 +1896,52 @@ function gasSalvar(){
     config:state.config,
     savedAt:new Date().toISOString()
   });
-  google.script.run
-    .withSuccessHandler(()=>{ gdStatus("✅ Salvo! "+new Date().toLocaleTimeString("pt-BR"),"ok"); showToast("☁️ Dados salvos com sucesso!"); })
-    .withFailureHandler(e=>gdStatus("❌ Erro ao salvar: "+e.message,"erro"))
-    .salvarDados(dados);
+  // salvar também no localStorage como backup
+  try{ localStorage.setItem("samuel_class_dados", dados); }catch(e){}
+  try{
+    const resp = await fetch(GAS_URL+"?action=salvar", {
+      method:"POST",
+      mode:"no-cors",
+      headers:{"Content-Type":"text/plain"},
+      body:dados
+    });
+    gdStatus("✅ Salvo! "+new Date().toLocaleTimeString("pt-BR"),"ok");
+    showToast("☁️ Dados salvos com sucesso!");
+  } catch(e){
+    gdStatus("⚠️ Salvo localmente","info");
+    showToast("💾 Dados salvos no dispositivo!");
+  }
 }
 
-function gasCarregar(){
+async function gasCarregar(){
   gdStatus("🔄 Carregando...","sync");
-  google.script.run
-    .withSuccessHandler(json=>{
-      if(!json||json==="{}"){gdStatus("☁️ Nenhum dado salvo ainda.","info");return;}
-      try{
-        const d=JSON.parse(json);
-        if(d.aulas) state.aulas=d.aulas;
-        if(d.entregas) state.entregas=d.entregas;
-        if(d.entregasMeta) state.entregasMeta=d.entregasMeta;
-        if(d.config) state.config=d.config;
-        if(d.alunos){
-          TURMAS.forEach(t=>{ if(!d.alunos[t]||d.alunos[t].length===0) d.alunos[t]=ALUNOS_INICIAIS[t]||[]; });
-          state.alunos=d.alunos;
-        }
-        gdStatus("✅ Dados carregados!","ok");
-        renderPage(state.currentPage);
-      }catch(e){ gdStatus("❌ Erro ao processar dados","erro"); }
-    })
-    .withFailureHandler(e=>gdStatus("❌ Erro: "+e.message,"erro"))
-    .carregarDados();
+  try{
+    const resp = await fetch(GAS_URL+"?action=carregar");
+    const json = await resp.text();
+    aplicarDados(json);
+  } catch(e){
+    // tentar localStorage como fallback
+    const local = localStorage.getItem("samuel_class_dados");
+    if(local){ aplicarDados(local); gdStatus("📱 Dados carregados do dispositivo","ok"); }
+    else gdStatus("☁️ Nenhum dado encontrado","info");
+  }
+}
+
+function aplicarDados(json){
+  if(!json||json==="{}"){gdStatus("☁️ Nenhum dado salvo ainda.","info");return;}
+  try{
+    const d=JSON.parse(json);
+    if(d.aulas) state.aulas=d.aulas;
+    if(d.entregas) state.entregas=d.entregas;
+    if(d.entregasMeta) state.entregasMeta=d.entregasMeta;
+    if(d.config) state.config=d.config;
+    if(d.alunos){
+      TURMAS.forEach(t=>{ if(!d.alunos[t]||d.alunos[t].length===0) d.alunos[t]=ALUNOS_INICIAIS[t]||[]; });
+      state.alunos=d.alunos;
+    }
+    gdStatus("✅ Dados carregados!","ok");
+    renderPage(state.currentPage);
+  }catch(e){ gdStatus("❌ Erro ao processar dados","erro"); }
 }
 
 function instalarPWA(){
@@ -1933,7 +1955,7 @@ function instalarPWA(){
 
 // auto-save após ações importantes
 function autoSave(){
-  if(typeof google!=="undefined"&&google.script) gasSalvar();
+  gasSalvar();
 }
 
 // ─── BIND EVENTS & INIT ──────────────────────────────────────────────────────
@@ -1948,6 +1970,8 @@ function init(){
   sel.innerHTML=TURMAS.map(t=>`<option>${esc(t)}</option>`).join("");
   document.getElementById("aula-data").value=hoje();
   renderPage("home");
+  // carregar dados automaticamente ao abrir
+  setTimeout(()=> gasCarregar(), 800);
 }
 
 init();
