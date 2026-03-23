@@ -1,0 +1,25 @@
+{
+  "name": "Samuel Class",
+  "short_name": "Samuel Class",
+  "description": "Sistema de Gestão Pedagógica — Prof. Samuel Oliveira · CETI Polivalente",
+  "start_url": "/samuel-class/",
+  "scope": "/samuel-class/",
+  "display": "standalone",
+  "background_color": "#0d1b2a",
+  "theme_color": "#1e3a8a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
