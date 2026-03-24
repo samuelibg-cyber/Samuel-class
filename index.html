@@ -1948,48 +1948,53 @@ function gdStatus(msg, tipo="info"){
   if(tipo==="ok") setTimeout(()=>{el.style.display="none";},3000);
 }
 
+const CHAVE = "samuelclass_v1";
+
+function _salvarLocal(){
+  try{
+    const dados={aulas:state.aulas,alunos:state.alunos,entregas:state.entregas,
+      entregasMeta:state.entregasMeta,config:state.config,savedAt:new Date().toISOString()};
+    localStorage.setItem(CHAVE, JSON.stringify(dados));
+    return true;
+  }catch(e){ return false; }
+}
+
+function _carregarLocal(){
+  try{
+    const raw=localStorage.getItem(CHAVE);
+    if(!raw||raw==="{}") return false;
+    const d=JSON.parse(raw);
+    if(d.aulas) state.aulas=d.aulas;
+    if(d.entregas) state.entregas=d.entregas;
+    if(d.entregasMeta) state.entregasMeta=d.entregasMeta;
+    if(d.config) state.config=d.config;
+    if(d.alunos){
+      TURMAS.forEach(t=>{if(!d.alunos[t]||!d.alunos[t].length) d.alunos[t]=ALUNOS_INICIAIS[t]||[];});
+      state.alunos=d.alunos;
+    }
+    return true;
+  }catch(e){ return false; }
+}
+
 function gasSalvar(){
-  gdStatus("🔄 Salvando...","sync");
-  const dados = JSON.stringify({
-    aulas:state.aulas,
-    alunos:state.alunos,
-    entregas:state.entregas,
-    entregasMeta:state.entregasMeta,
-    config:state.config,
-    savedAt:new Date().toISOString()
-  });
-  google.script.run
-    .withSuccessHandler(()=>{ gdStatus("✅ Salvo! "+new Date().toLocaleTimeString("pt-BR"),"ok"); showToast("☁️ Dados salvos com sucesso!"); })
-    .withFailureHandler(e=>gdStatus("❌ Erro ao salvar: "+e.message,"erro"))
-    .salvarDados(dados);
+  const ok=_salvarLocal();
+  gdStatus(ok?"✅ Salvo! "+new Date().toLocaleTimeString("pt-BR"):"❌ Erro ao salvar", ok?"ok":"erro");
+  if(ok) showToast("💾 Dados salvos!");
 }
 
 function gasCarregar(){
-  gdStatus("🔄 Carregando...","sync");
-  google.script.run
-    .withSuccessHandler(json=>{
-      if(!json||json==="{}"){gdStatus("☁️ Nenhum dado salvo ainda.","info");return;}
-      try{
-        const d=JSON.parse(json);
-        if(d.aulas) state.aulas=d.aulas;
-        if(d.entregas) state.entregas=d.entregas;
-        if(d.entregasMeta) state.entregasMeta=d.entregasMeta;
-        if(d.config) state.config=d.config;
-        if(d.alunos){
-          TURMAS.forEach(t=>{ if(!d.alunos[t]||d.alunos[t].length===0) d.alunos[t]=ALUNOS_INICIAIS[t]||[]; });
-          state.alunos=d.alunos;
-        }
-        gdStatus("✅ Dados carregados!","ok");
-        renderPage(state.currentPage);
-      }catch(e){ gdStatus("❌ Erro ao processar dados","erro"); }
-    })
-    .withFailureHandler(e=>gdStatus("❌ Erro: "+e.message,"erro"))
-    .carregarDados();
+  const ok=_carregarLocal();
+  if(ok){
+    gdStatus("✅ Dados carregados!","ok");
+    renderPage(state.currentPage);
+  } else {
+    gdStatus("☁️ Nenhum dado salvo ainda.","info");
+  }
 }
 
-// auto-save após ações importantes
+// auto-save após cada ação
 function autoSave(){
-  if(typeof google!=="undefined"&&google.script) gasSalvar();
+  _salvarLocal();
 }
 
 // ─── BIND EVENTS & INIT ──────────────────────────────────────────────────────
@@ -2003,6 +2008,8 @@ function init(){
   const sel=document.getElementById("aula-turma");
   sel.innerHTML=TURMAS.map(t=>`<option>${esc(t)}</option>`).join("");
   document.getElementById("aula-data").value=hoje();
+  // carregar dados salvos antes de renderizar
+  _carregarLocal();
   renderPage("home");
 }
 
