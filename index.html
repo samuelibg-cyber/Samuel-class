@@ -2,15 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
-<meta name="theme-color" content="#1e3a8a"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="Samuel Class"/>
-<meta name="mobile-web-app-capable" content="yes"/>
-<link rel="manifest" href="manifest.json"/>
-<link rel="apple-touch-icon" href="%C3%ADcone.png"/>
-<title>Samuel Class</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Sistema Pedagógico — Prof. Samuel Oliveira</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 
 <style>
@@ -276,9 +269,6 @@ label{display:block;font-weight:600;font-size:13px;margin-bottom:5px;color:var(-
     <button class="menu-btn" onclick="toggleSidebar()">☰</button>
     <div class="top-title" id="top-title">Home</div>
     <div class="top-date" id="top-date"></div>
-    <button id="pwa-install-btn" style="display:none;align-items:center;gap:6px;background:linear-gradient(135deg,#16a34a,#0d9488);color:#fff;border:none;border-radius:9px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit" onclick="instalarPWA()">
-      📲 Instalar App
-    </button>
     <div id="gd-bar" style="display:flex;align-items:center;gap:8px;flex-shrink:0">
       <span id="gd-status" style="font-size:11px;display:none" class="top-date"></span>
       <button class="btn btn-sm" style="background:linear-gradient(135deg,#4285f4,#34a853);color:#fff;border:none;font-size:12px;padding:6px 14px;display:inline-flex;align-items:center;gap:5px" onclick="gasSalvar()">
@@ -995,14 +985,61 @@ function renderDashboard(){
   const totalEntregas=Object.values(state.entregas).filter(Boolean).length;
   const recentes=[...state.aulas].sort((a,b)=>b.data.localeCompare(a.data)).slice(0,6);
 
-  // alerts
+  // ── alertas gerais ──
   const alerts=[];
   TURMAS.forEach(t=>{
     const aulasT=state.aulas.filter(a=>a.turma===t);
     if(!aulasT.length) return;
     const ultima=aulasT.map(a=>a.data).sort().at(-1);
     const diff=Math.floor((new Date()-new Date(ultima+"T12:00:00"))/(86400000));
-    if(diff>10) alerts.push(`Turma <strong>${esc(t)}</strong> sem registro há ${diff} dias`);
+    if(diff>10) alerts.push({tipo:"turma",msg:`Turma <strong>${esc(t)}</strong> sem registro há ${diff} dias`});
+  });
+
+  // ── alertas de prazo ──
+  const alertasPrazo=[];
+  const amanha = new Date(); amanha.setDate(amanha.getDate()+1);
+  const amanhaStr = amanha.toISOString().split("T")[0];
+
+  state.aulas.forEach(aula=>{
+    (aula.atividades||[]).forEach(at=>{
+      if(!at.prazo) return;
+      const alunosT = state.alunos[aula.turma]||[];
+      // contar quantos ainda não entregaram
+      const pendentes = alunosT.filter(al=>!state.entregas[`${aula.id}_${at.id}_${al.id}`]).length;
+      if(pendentes===0) return; // todos entregaram
+      if(at.prazo===hoje()){
+        alertasPrazo.push({
+          tipo:"hoje",
+          atividade:at.nome,
+          turma:aula.turma,
+          disciplina:aula.disciplina,
+          conteudo:aula.conteudo,
+          pendentes,
+          total:alunosT.length
+        });
+      } else if(at.prazo===amanhaStr){
+        alertasPrazo.push({
+          tipo:"amanha",
+          atividade:at.nome,
+          turma:aula.turma,
+          disciplina:aula.disciplina,
+          conteudo:aula.conteudo,
+          pendentes,
+          total:alunosT.length
+        });
+      } else if(at.prazo<hoje()){
+        alertasPrazo.push({
+          tipo:"vencida",
+          atividade:at.nome,
+          turma:aula.turma,
+          disciplina:aula.disciplina,
+          conteudo:aula.conteudo,
+          pendentes,
+          total:alunosT.length,
+          prazo:at.prazo
+        });
+      }
+    });
   });
 
   // desempenho por turma
@@ -1050,6 +1087,34 @@ function renderDashboard(){
     <div class="stat-card" style="border-top-color:#d97706;cursor:pointer" onclick="goPage('aulas',document.querySelectorAll('.nav-item')[2])"><div style="font-size:28px">📝</div><div class="stat-val" style="color:#d97706">${totalAtiv}</div><div class="stat-lbl">Atividades Aplicadas</div></div>
     <div class="stat-card" style="border-top-color:#16a34a;cursor:pointer" onclick="goPage('relatorios',document.querySelectorAll('.nav-item')[5])"><div style="font-size:28px">✅</div><div class="stat-val" style="color:#16a34a">${totalEntregas}</div><div class="stat-lbl">Entregas Realizadas</div></div>
   </div>
+  ${alertasPrazo.length>0?`
+  <div class="card" style="border:2px solid #fbbf24;background:#fffbeb">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <span style="font-size:22px">⏰</span>
+      <div class="card-title" style="margin:0;color:#92400e">Prazos de Entrega</div>
+      <span style="background:#dc2626;color:#fff;border-radius:12px;padding:2px 10px;font-size:12px;font-weight:800;margin-left:auto">${alertasPrazo.length}</span>
+    </div>
+    ${alertasPrazo.map(a=>{
+      const cor=a.tipo==="hoje"?"#dc2626":a.tipo==="amanha"?"#d97706":"#7c3aed";
+      const bg=a.tipo==="hoje"?"#fee2e2":a.tipo==="amanha"?"#fef3c7":"#ede9fe";
+      const label=a.tipo==="hoje"?"🔴 ENCERRA HOJE":a.tipo==="amanha"?"🟡 Encerra amanhã":`🟣 Vencida em ${fmtData(a.prazo)}`;
+      return `<div style="background:${bg};border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:4px solid ${cor}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+          <div>
+            <div style="font-weight:800;font-size:14px;color:${cor}">${label}</div>
+            <div style="font-weight:700;font-size:13px;color:#1e293b;margin-top:3px">📝 ${esc(a.atividade)}</div>
+            <div style="font-size:12px;color:#475569;margin-top:2px">👥 ${esc(a.turma)} · ${esc(a.disciplina)==="Inteligência Artificial"?"🤖 IA":"🏃 EF"}</div>
+            <div style="font-size:12px;color:#475569">📖 ${esc(a.conteudo).substring(0,45)}${a.conteudo.length>45?"...":""}</div>
+          </div>
+          <div style="text-align:center;flex-shrink:0">
+            <div style="font-weight:900;font-size:22px;color:${cor}">${a.pendentes}</div>
+            <div style="font-size:10px;color:#64748b;font-weight:600">pendente${a.pendentes>1?"s":""}<br>de ${a.total}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join("")}
+  </div>`:""}
+
   <div class="row2">
     <div class="card">
       <div class="card-title">📅 Aulas de Hoje</div>
@@ -1061,7 +1126,7 @@ function renderDashboard(){
     </div>
     <div class="card">
       <div class="card-title">🚨 Alertas Inteligentes</div>
-      ${alerts.length===0?'<div class="empty">✅ Tudo em dia! Nenhum alerta.</div>':alerts.map(a=>`<div class="alert-item">⚠️ ${a}</div>`).join("")}
+      ${alerts.length===0?'<div class="empty">✅ Tudo em dia! Nenhum alerta.</div>':alerts.map(a=>`<div class="alert-item">⚠️ ${a.msg}</div>`).join("")}
     </div>
   </div>
 
@@ -1883,29 +1948,7 @@ function gdStatus(msg, tipo="info"){
   if(tipo==="ok") setTimeout(()=>{el.style.display="none";},3000);
 }
 
-// URL do Google Apps Script — backend de dados
-const GAS_URL = "https://script.google.com/macros/s/AKfycbx4LgPE3VTKHK846yRcBTL72-UVo-JUKaeiF60xr9zmGEQavfolbhPP5iW0BDUzklB9UA/exec";
-
-function aplicarDados(json){
-  if(!json||json==="{}"||json==="null"||!json.trim()){gdStatus("☁️ Nenhum dado salvo ainda.","info");return;}
-  try{
-    const d=JSON.parse(json);
-    if(d.aulas) state.aulas=d.aulas;
-    if(d.entregas) state.entregas=d.entregas;
-    if(d.entregasMeta) state.entregasMeta=d.entregasMeta;
-    if(d.config) state.config=d.config;
-    if(d.alunos){
-      TURMAS.forEach(t=>{ if(!d.alunos[t]||d.alunos[t].length===0) d.alunos[t]=ALUNOS_INICIAIS[t]||[]; });
-      state.alunos=d.alunos;
-    }
-    // salvar cópia local
-    try{ localStorage.setItem("samuel_class_dados", json); }catch(e){}
-    gdStatus("✅ Dados carregados!","ok");
-    renderPage(state.currentPage);
-  }catch(e){ gdStatus("❌ Erro ao processar dados: "+e.message,"erro"); }
-}
-
-async function gasSalvar(){
+function gasSalvar(){
   gdStatus("🔄 Salvando...","sync");
   const dados = JSON.stringify({
     aulas:state.aulas,
@@ -1915,68 +1958,38 @@ async function gasSalvar(){
     config:state.config,
     savedAt:new Date().toISOString()
   });
-  // sempre salvar localmente primeiro
-  try{ localStorage.setItem("samuel_class_dados", dados); }catch(e){}
-
-  // salvar na nuvem via GET com dados codificados
-  try{
-    const encoded = encodeURIComponent(dados);
-    // usar iframe trick para contornar CORS no Apps Script
-    const url = GAS_URL + "?action=salvar&dados=" + encoded;
-    // criar iframe invisível para fazer o GET sem CORS
-    const iframe = document.createElement("iframe");
-    iframe.style.display="none";
-    iframe.src = url;
-    document.body.appendChild(iframe);
-    setTimeout(()=>{ 
-      try{document.body.removeChild(iframe);}catch(e){}
-    }, 5000);
-    gdStatus("✅ Salvo! "+new Date().toLocaleTimeString("pt-BR"),"ok");
-    showToast("☁️ Dados salvos com sucesso!");
-  } catch(e){
-    gdStatus("💾 Salvo localmente","info");
-    showToast("💾 Dados salvos no dispositivo!");
-  }
+  google.script.run
+    .withSuccessHandler(()=>{ gdStatus("✅ Salvo! "+new Date().toLocaleTimeString("pt-BR"),"ok"); showToast("☁️ Dados salvos com sucesso!"); })
+    .withFailureHandler(e=>gdStatus("❌ Erro ao salvar: "+e.message,"erro"))
+    .salvarDados(dados);
 }
 
-async function gasCarregar(){
-  gdStatus("🔄 Carregando da nuvem...","sync");
-  try{
-    const resp = await fetch(GAS_URL+"?action=carregar", {cache:"no-store"});
-    if(!resp.ok) throw new Error("HTTP "+resp.status);
-    const json = await resp.text();
-    if(json && json!=="{}" && json!=="null"){
-      aplicarDados(json);
-    } else {
-      // fallback para localStorage
-      const local = localStorage.getItem("samuel_class_dados");
-      if(local){ aplicarDados(local); gdStatus("📱 Carregado do dispositivo","ok"); }
-      else gdStatus("☁️ Nenhum dado encontrado","info");
-    }
-  } catch(e){
-    // fallback para localStorage
-    const local = localStorage.getItem("samuel_class_dados");
-    if(local){ 
-      aplicarDados(local); 
-      gdStatus("📱 Carregado do dispositivo (sem internet)","ok"); 
-    } else {
-      gdStatus("❌ Sem dados e sem conexão","erro");
-    }
-  }
-}
-
-function instalarPWA(){
-  if(!deferredPrompt){ showToast('Use o menu do navegador → "Adicionar à tela inicial"'); return; }
-  deferredPrompt.prompt();
-  deferredPrompt.userChoice.then(r=>{
-    if(r.outcome==='accepted') showToast('✅ Instalando Samuel Class...');
-    deferredPrompt=null;
-  });
+function gasCarregar(){
+  gdStatus("🔄 Carregando...","sync");
+  google.script.run
+    .withSuccessHandler(json=>{
+      if(!json||json==="{}"){gdStatus("☁️ Nenhum dado salvo ainda.","info");return;}
+      try{
+        const d=JSON.parse(json);
+        if(d.aulas) state.aulas=d.aulas;
+        if(d.entregas) state.entregas=d.entregas;
+        if(d.entregasMeta) state.entregasMeta=d.entregasMeta;
+        if(d.config) state.config=d.config;
+        if(d.alunos){
+          TURMAS.forEach(t=>{ if(!d.alunos[t]||d.alunos[t].length===0) d.alunos[t]=ALUNOS_INICIAIS[t]||[]; });
+          state.alunos=d.alunos;
+        }
+        gdStatus("✅ Dados carregados!","ok");
+        renderPage(state.currentPage);
+      }catch(e){ gdStatus("❌ Erro ao processar dados","erro"); }
+    })
+    .withFailureHandler(e=>gdStatus("❌ Erro: "+e.message,"erro"))
+    .carregarDados();
 }
 
 // auto-save após ações importantes
 function autoSave(){
-  gasSalvar();
+  if(typeof google!=="undefined"&&google.script) gasSalvar();
 }
 
 // ─── BIND EVENTS & INIT ──────────────────────────────────────────────────────
@@ -1991,33 +2004,9 @@ function init(){
   sel.innerHTML=TURMAS.map(t=>`<option>${esc(t)}</option>`).join("");
   document.getElementById("aula-data").value=hoje();
   renderPage("home");
-  // carregar dados automaticamente ao abrir
-  setTimeout(()=> gasCarregar(), 800);
 }
 
 init();
-
-// ─── SERVICE WORKER (PWA) ────────────────────────────────────────────────────
-if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js')
-      .then(()=>console.log('Samuel Class PWA pronto! ✅'))
-      .catch(e=>console.log('SW erro:',e));
-  });
-}
-
-// ─── INSTALL PROMPT ──────────────────────────────────────────────────────────
-let deferredPrompt=null;
-window.addEventListener('beforeinstallprompt', e=>{
-  e.preventDefault();
-  deferredPrompt=e;
-  document.getElementById('pwa-install-btn').style.display='flex';
-});
-
-window.addEventListener('appinstalled', ()=>{
-  document.getElementById('pwa-install-btn').style.display='none';
-  showToast('✅ Samuel Class instalado com sucesso!');
-});
 </script>
 </body>
 </html>
