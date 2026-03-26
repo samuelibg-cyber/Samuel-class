@@ -1,9 +1,4 @@
-const CACHE = 'samuel-class-v2';
-const ASSETS = [
-  'https://samuelibg-cyber.github.io/Samuel-class/',
-  'https://samuelibg-cyber.github.io/Samuel-class/index.html',
-  'https://samuelibg-cyber.github.io/Samuel-class/manifest.json'
-];
+const CACHE = 'samuel-class-v3';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -12,17 +7,17 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.map(k => caches.delete(k)))
+      Promise.all(keys.map(k => {
+        console.log('Deletando cache:', k);
+        return caches.delete(k);
+      }))
     ).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', e => {
+  // sempre buscar da rede, sem cache
   e.respondWith(
-    fetch(e.request).then(response => {
-      const clone = response.clone();
-      caches.open(CACHE).then(c => c.put(e.request, clone));
-      return response;
-    }).catch(() => caches.match(e.request))
+    fetch(e.request).catch(() => caches.match(e.request))
   );
 });
