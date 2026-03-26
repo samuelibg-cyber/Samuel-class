@@ -1914,6 +1914,26 @@ function salvarConfig(){
   showToast("✅ Configurações salvas com sucesso!");
 }
 
+function resetarListaAlunos(){
+  if(!confirm("⚠️ Isso vai SUBSTITUIR a lista de alunos pelos dados oficiais de 2026 e apagar alunos antigos.\n\nAs aulas e entregas já registradas serão mantidas.\n\nDeseja continuar?")) return;
+  // Reset alunos to fresh ALUNOS_INICIAIS
+  state.alunos = JSON.parse(JSON.stringify(ALUNOS_INICIAIS));
+  autoSave();
+  showToast("✅ Lista de alunos atualizada para 2026!");
+  renderPage(state.currentPage);
+}
+
+function resetarTudoLocal(){
+  if(!confirm("⚠️ ATENÇÃO: Isso vai apagar TODOS os dados salvos (aulas, entregas, alunos) e reiniciar do zero.\n\nEssa ação não pode ser desfeita!\n\nDeseja continuar?")) return;
+  try{ localStorage.removeItem("samuelclass_v1"); }catch(e){}
+  state.aulas=[];
+  state.alunos=JSON.parse(JSON.stringify(ALUNOS_INICIAIS));
+  state.entregas={};
+  state.entregasMeta={};
+  showToast("✅ Sistema reiniciado!");
+  renderPage("home");
+}
+
 // ─── GOOGLE APPS SCRIPT INTEGRATION ─────────────────────────────────────────
 function gdStatus(msg, tipo="info"){
   const el=document.getElementById("gd-status");
@@ -1934,6 +1954,8 @@ function _salvarLocal(){
   }catch(e){ return false; }
 }
 
+const DATA_VERSION = "2026v1";
+
 function _carregarLocal(){
   try{
     const raw=localStorage.getItem(CHAVE);
@@ -1943,9 +1965,18 @@ function _carregarLocal(){
     if(d.entregas) state.entregas=d.entregas;
     if(d.entregasMeta) state.entregasMeta=d.entregasMeta;
     if(d.config) state.config=d.config;
-    if(d.alunos){
+    // verificar versão dos alunos — se desatualizada, resetar para lista 2026
+    const savedVer = localStorage.getItem("samuelclass_version");
+    if(savedVer === DATA_VERSION && d.alunos){
+      // versão correta — manter alunos salvos
       TURMAS.forEach(t=>{if(!d.alunos[t]||!d.alunos[t].length) d.alunos[t]=ALUNOS_INICIAIS[t]||[];});
       state.alunos=d.alunos;
+    } else {
+      // versão antiga — resetar alunos para lista oficial 2026
+      state.alunos = JSON.parse(JSON.stringify(ALUNOS_INICIAIS));
+      localStorage.setItem("samuelclass_version", DATA_VERSION);
+      // salvar imediatamente com alunos corretos
+      _salvarLocal();
     }
     return true;
   }catch(e){ return false; }
