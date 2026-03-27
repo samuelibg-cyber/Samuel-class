@@ -372,6 +372,28 @@ label{display:block;font-weight:600;font-size:13px;margin-bottom:5px;color:var(-
   </div>
 </div>
 
+<!-- MODAL AULAS REGISTRADAS -->
+<div class="modal-backdrop" id="modal-aulas-reg">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-head">
+      <div class="modal-title">📚 Aulas Registradas</div>
+      <button class="modal-close" onclick="closeModal('modal-aulas-reg')">✕</button>
+    </div>
+    <div class="modal-body" id="modal-aulas-reg-body"></div>
+  </div>
+</div>
+
+<!-- MODAL ATIVIDADES APLICADAS -->
+<div class="modal-backdrop" id="modal-ativ-aplicadas">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-head">
+      <div class="modal-title">📝 Atividades Aplicadas</div>
+      <button class="modal-close" onclick="closeModal('modal-ativ-aplicadas')">✕</button>
+    </div>
+    <div class="modal-body" id="modal-ativ-body"></div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -1058,8 +1080,8 @@ function renderDashboard(){
   </div>
   <div class="stats-grid">
     <div class="stat-card" style="border-top-color:#2563eb;cursor:pointer" onclick="goPage('turmas',document.querySelectorAll('.nav-item')[1])"><div style="font-size:28px">👨‍🎓</div><div class="stat-val" style="color:#2563eb">${totalAlunos}</div><div class="stat-lbl">Total de Alunos</div></div>
-    <div class="stat-card" style="border-top-color:#7c3aed;cursor:pointer" onclick="goPage('aulas',document.querySelectorAll('.nav-item')[2])"><div style="font-size:28px">📚</div><div class="stat-val" style="color:#7c3aed">${state.aulas.length}</div><div class="stat-lbl">Aulas Registradas</div></div>
-    <div class="stat-card" style="border-top-color:#d97706;cursor:pointer" onclick="goPage('aulas',document.querySelectorAll('.nav-item')[2])"><div style="font-size:28px">📝</div><div class="stat-val" style="color:#d97706">${totalAtiv}</div><div class="stat-lbl">Atividades Aplicadas</div></div>
+    <div class="stat-card" style="border-top-color:#7c3aed;cursor:pointer" onclick="abrirModalAulasRegistradas()"><div style="font-size:28px">📚</div><div class="stat-val" style="color:#7c3aed">${state.aulas.length}</div><div class="stat-lbl">Aulas Registradas</div></div>
+    <div class="stat-card" style="border-top-color:#d97706;cursor:pointer" onclick="abrirModalAtividadesAplicadas()"><div style="font-size:28px">📝</div><div class="stat-val" style="color:#d97706">${totalAtiv}</div><div class="stat-lbl">Atividades Aplicadas</div></div>
     <div class="stat-card" style="border-top-color:#16a34a;cursor:pointer" onclick="goPage('relatorios',document.querySelectorAll('.nav-item')[5])"><div style="font-size:28px">✅</div><div class="stat-val" style="color:#16a34a">${totalEntregas}</div><div class="stat-lbl">Entregas Realizadas</div></div>
   </div>
   ${alertasPrazo.length>0?`
@@ -1212,7 +1234,7 @@ function gerarRelatorioHome(){
     @media print{body{padding:16px}}
   </style></head><body>
   <div style="text-align:center;margin-bottom:24px;padding-bottom:20px;border-bottom:2px solid #1e3a8a">
-    <div style="font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#94a3b8">CETI Polivalente</div>
+    <div style="font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#94a3b8">CETI Polivalente — Amarante, PI</div>
     <h1>RELATÓRIO GERAL — HOME</h1>
     <div class="sub">Professor: <strong>Samuel Oliveira</strong> &nbsp;·&nbsp; Gerado em: <strong>${fmtData(hoje())}</strong></div>
   </div>
@@ -1800,7 +1822,7 @@ function renderRelatorios(){
   const previewHtml=state.relPreview?`
   <div class="rel-preview" id="relatorio-pdf">
     <div class="rel-cab">
-      <div class="rel-escola">CETI Polivalente — Fortaleza, CE</div>
+      <div class="rel-escola">CETI Polivalente — Amarante, PI</div>
       <div class="rel-titulo">RELATÓRIO PEDAGÓGICO</div>
       <div class="rel-sub">Professor: <strong>Samuel Oliveira</strong></div>
       <div class="rel-sub">Disciplina: <strong>${esc(disc)}</strong> · Turma: <strong>${esc(turma)}</strong></div>
@@ -1996,6 +2018,94 @@ function gasCarregar(){
   } else {
     gdStatus("☁️ Nenhum dado salvo ainda.","info");
   }
+}
+
+function abrirModalAulasRegistradas(){
+  const disc1 = DISCIPLINAS[0];
+  const disc2 = DISCIPLINAS[1];
+  const aulas1 = [...state.aulas].filter(a=>a.disciplina===disc1).sort((a,b)=>b.data.localeCompare(a.data));
+  const aulas2 = [...state.aulas].filter(a=>a.disciplina===disc2).sort((a,b)=>b.data.localeCompare(a.data));
+
+  const renderAulasList = (lista) => {
+    if(!lista.length) return '<div class="empty">Nenhuma aula registrada.</div>';
+    return lista.map(a=>`
+      <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f1f5f9;cursor:pointer" onclick="closeModal('modal-aulas-reg');state.selectedTurma='${esc(a.turma)}';state.selectedDisc='${esc(a.disciplina)}';goPage('aulas',document.querySelectorAll('.nav-item')[2])">
+        <div style="flex-shrink:0">
+          <span class="${a.disciplina==="Inteligência Artificial"?"badge-ia":"badge-ef"}">${a.disciplina==="Inteligência Artificial"?"IA":"EF"}</span>
+        </div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:13px">${esc(a.turma)}</div>
+          <div style="color:#64748b;font-size:12px">${esc(a.conteudo)}</div>
+          <div style="color:#94a3b8;font-size:11px">${fmtData(a.data)} · ${esc(a.tipo)} · ${a.atividades?.length||0} atividade(s)</div>
+        </div>
+        <span class="${a.tipo==="Prática"?"badge-prat":a.tipo==="Teórica"?"badge-teor":"badge-aval"}">${esc(a.tipo)}</span>
+      </div>`).join("");
+  };
+
+  document.getElementById("modal-aulas-reg-body").innerHTML=`
+    <div style="display:flex;gap:6px;margin-bottom:16px;border-bottom:2px solid var(--border)">
+      <button class="tab active" id="tab-aulas-ef" onclick="switchTabAulas('ef')">🏃 Educação Física (${aulas1.length})</button>
+      <button class="tab" id="tab-aulas-ia" onclick="switchTabAulas('ia')">🤖 Inteligência Artificial (${aulas2.length})</button>
+    </div>
+    <div id="aulas-list-ef">${renderAulasList(aulas1)}</div>
+    <div id="aulas-list-ia" style="display:none">${renderAulasList(aulas2)}</div>`;
+  openModal("modal-aulas-reg");
+}
+
+function switchTabAulas(tab){
+  document.getElementById("aulas-list-ef").style.display=tab==="ef"?"block":"none";
+  document.getElementById("aulas-list-ia").style.display=tab==="ia"?"block":"none";
+  document.getElementById("tab-aulas-ef").className="tab"+(tab==="ef"?" active":"");
+  document.getElementById("tab-aulas-ia").className="tab"+(tab==="ia"?" active":"");
+}
+
+function abrirModalAtividadesAplicadas(){
+  // agrupar atividades por disciplina e turma
+  const disc1 = DISCIPLINAS[0];
+  const disc2 = DISCIPLINAS[1];
+
+  const renderAtivList = (disc) => {
+    const aulasDisc = [...state.aulas].filter(a=>a.disciplina===disc).sort((a,b)=>b.data.localeCompare(a.data));
+    const todasAtiv = [];
+    aulasDisc.forEach(a=>{
+      (a.atividades||[]).forEach(at=>{
+        const alunosT = state.alunos[a.turma]||[];
+        const entregues = alunosT.filter(al=>state.entregas[`${a.id}_${at.id}_${al.id}`]).length;
+        todasAtiv.push({aula:a, at, entregues, total:alunosT.length});
+      });
+    });
+    if(!todasAtiv.length) return '<div class="empty">Nenhuma atividade registrada.</div>';
+    return todasAtiv.map(({aula,at,entregues,total})=>`
+      <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f1f5f9;cursor:pointer" onclick="closeModal('modal-ativ-aplicadas');state.selectedTurma='${esc(aula.turma)}';state.selectedDisc='${esc(aula.disciplina)}';state.turmAulaAtiva=${aula.id};state.turmAtAtiva=${at.id};goPage('turmas',document.querySelectorAll('.nav-item')[1])">
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:13px">${esc(at.nome)}</div>
+          <div style="color:#475569;font-size:12px">👥 ${esc(aula.turma)} · 📅 ${fmtData(aula.data)}</div>
+          <div style="color:#64748b;font-size:12px">📖 ${esc(aula.conteudo).substring(0,40)}${aula.conteudo.length>40?"...":""}</div>
+          ${at.prazo?`<div style="color:#2563eb;font-size:11px">⏰ Prazo: ${fmtData(at.prazo)}</div>`:""}
+        </div>
+        <div style="text-align:center;flex-shrink:0">
+          <div style="font-weight:800;font-size:18px;color:${entregues===total&&total>0?"#16a34a":entregues>0?"#d97706":"#dc2626"}">${entregues}/${total}</div>
+          <div style="font-size:10px;color:#94a3b8">entregas</div>
+          <div style="font-size:11px;font-weight:700;color:#d97706">🏅 ${at.pontos}pts</div>
+        </div>
+      </div>`).join("");
+  };
+
+  document.getElementById("modal-ativ-body").innerHTML=`
+    <div style="display:flex;gap:6px;margin-bottom:16px;border-bottom:2px solid var(--border)">
+      <button class="tab active" id="tab-ativ-ef" onclick="switchTabAtiv('ef')">🏃 Educação Física</button>
+      <button class="tab" id="tab-ativ-ia" onclick="switchTabAtiv('ia')">🤖 Inteligência Artificial</button>
+    </div>
+    <div id="ativ-list-ef">${renderAtivList(disc1)}</div>
+    <div id="ativ-list-ia" style="display:none">${renderAtivList(disc2)}</div>`;
+  openModal("modal-ativ-aplicadas");
+}
+
+function switchTabAtiv(tab){
+  document.getElementById("ativ-list-ef").style.display=tab==="ef"?"block":"none";
+  document.getElementById("ativ-list-ia").style.display=tab==="ia"?"block":"none";
+  document.getElementById("tab-ativ-ef").className="tab"+(tab==="ef"?" active":"");
+  document.getElementById("tab-ativ-ia").className="tab"+(tab==="ia"?" active":"");
 }
 
 // auto-save após cada ação
